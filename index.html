@@ -1554,10 +1554,10 @@ function IncidentsView({data, incidents, setIncidents, syncStatus, onRefresh}) {
           <div className="section-sub">
             {incidents.length} total · {incidents.filter(i=>i.status!=='Resolved').length} open
             {SCRIPT_URL
-              ? <span style={{marginLeft:10,fontSize:11,color: incidentSyncStatus==='synced'?'var(--green)':incidentSyncStatus==='error'?'var(--red)':'var(--text-dim)'}}>
-                  {incidentSyncStatus==='synced'?'● Live sync':'incidentSyncStatus'==='error'?'⚠ Sync error':'● Connecting…'}
+              ? <span style={{marginLeft:10,fontSize:11,color: syncStatus==='synced'?'var(--green)':syncStatus==='error'?'var(--red)':'var(--text-dim)'}}>
+                  {syncStatus==='synced'?'● Live sync':syncStatus==='error'?'⚠ Sync error':'● Connecting…'}
                 </span>
-              : <span style={{marginLeft:10,fontSize:11,color:'var(--amber)'}}>⚠ Local only — set SCRIPT_URL to enable shared sync</span>
+              : <span style={{marginLeft:10,fontSize:11,color:'var(--amber)'}}>⚠ Local only</span>
             }
           </div>
         </div>
