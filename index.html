@@ -308,7 +308,13 @@ function parseDate(s) {
 function normFlight(num) {
   const n = cv(num).toUpperCase().replace(/\s+/g,'');
   if (['', '-', 'N/A', 'NA', 'NONE', 'UNKNOWNATPRESENT', 'NOTBOOKEDYET'].includes(n)) return '';
-  return n.replace(/^DELTADELTA/,'DL').replace(/^DELTA(?=[A-Z])/,'DL');
+  const cleaned = n
+    .replace(/^DELTADELTA/,'DL').replace(/^DELTA(?=[A-Z0-9])/,'DL')
+    .replace(/^FRONTIER(?=[0-9])/,'F9').replace(/^AMERICAN(?=[0-9])/,'AA')
+    .replace(/^SOUTHWEST(?=[0-9])/,'WN').replace(/^UNITED(?=[0-9])/,'UA');
+  // Must contain at least one digit to be a real flight number; booking codes (6+ chars, no digits after prefix) are invalid
+  if (!/\d/.test(cleaned)) return '';
+  return cleaned;
 }
 
 function parseVolunteers(nameCell, phoneCell) {
@@ -322,7 +328,7 @@ function parseArrivalIAH(rows) {
   // Row 0 is header, rows 1-72 are working list, 72+ are old backup
   const arrivals = [];
   const seen = new Set();
-  for (let i = 1; i <= Math.min(72, rows.length - 1); i++) {
+  for (let i = 1; i <= Math.min(150, rows.length - 1); i++) {
     const r = rows[i];
     if (!r || r.length < 5) continue;
     const fn = cv(r[0]); const ln = cv(r[1]);
@@ -606,14 +612,23 @@ const STATUS_KEY = 'iscc_status_v2';
 function getFlightLink(airline, flightNum) {
   const num = (flightNum||'').replace(/\s+/g,'').toUpperCase();
   const air = (airline||'').toLowerCase();
-  if (!num || num === '-' || num.length < 2) return null;
-  // FlightAware link
-  if (air.includes('united') || air.includes('ua')) return `https://www.flightaware.com/live/flight/${num.startsWith('UA')?num:'UA'+num}`;
-  if (air.includes('frontier') || air.includes('f9')) return `https://www.flightaware.com/live/flight/FFT${num.replace(/^F9/,'')}`;
-  if (air.includes('delta') || air.includes('dl')) return `https://www.flightaware.com/live/flight/DAL${num.replace(/^DL/,'')}`;
-  if (air.includes('american') || air.includes('aa')) return `https://www.flightaware.com/live/flight/AAL${num}`;
-  if (air.includes('southwest') || air.includes('wn')) return `https://www.flightaware.com/live/flight/SWA${num.replace(/^WN/,'')}`;
-  if (air.includes('jetblue') || air.includes('b6')) return `https://www.flightaware.com/live/flight/JBU${num}`;
+  if (!num || num.length < 2) return null;
+  if (!/\d/.test(num)) return null; // booking codes / no digits = invalid
+  // FlightAware uses ICAO 3-letter codes (UAL not UA, DAL not DL, SWA not WN, etc.)
+  if (air.includes('united') || air.includes('ua'))
+    return `https://www.flightaware.com/live/flight/UAL${num.replace(/^UA/,'')}`;
+  if (air.includes('frontier') || air.includes('f9'))
+    return `https://www.flightaware.com/live/flight/FFT${num.replace(/^F9/,'')}`;
+  if (air.includes('delta') || air.includes('dl'))
+    return `https://www.flightaware.com/live/flight/DAL${num.replace(/^DL/,'')}`;
+  if (air.includes('american') || air.includes('aa'))
+    return `https://www.flightaware.com/live/flight/AAL${num.replace(/^AA/,'')}`;
+  if (air.includes('southwest') || air.includes('wn'))
+    return `https://www.flightaware.com/live/flight/SWA${num.replace(/^WN/,'')}`;
+  if (air.includes('air canada') || air.includes(' ac'))
+    return `https://www.flightaware.com/live/flight/ACA${num.replace(/^AC/,'')}`;
+  if (air.includes('jetblue') || air.includes('b6'))
+    return `https://www.flightaware.com/live/flight/JBU${num.replace(/^B6/,'')}`;
   return `https://www.flightaware.com/live/flight/${num}`;
 }
 
