@@ -609,6 +609,39 @@ const PASSWORD = 'ISCC2026';
 const STORAGE_KEY = 'iscc_incidents_v2';
 const STATUS_KEY = 'iscc_status_v2';
 
+// ---- Shared incident backend (Google Apps Script Web App) ----
+// After deploying AppsScript_Incidents.js, paste the Web App URL below:
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw3nQ4lQ85AZzs9pqKUvzxITlYXMFL2zMIZg3hfAJbvn6law82LJ1ZjCBwUNE459cy0Uw/exec';
+
+async function loadIncidentsFromSheet() {
+  if (!SCRIPT_URL) return null;
+  try {
+    const res = await fetch(SCRIPT_URL, { cache: 'no-store' });
+    const json = await res.json();
+    return json.ok ? json.incidents : null;
+  } catch(e) { return null; }
+}
+
+async function upsertIncidentToSheet(inc) {
+  if (!SCRIPT_URL) return;
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'upsert', incident: inc }),
+    });
+  } catch(e) { console.warn('Sheet upsert failed:', e); }
+}
+
+async function deleteIncidentFromSheet(id) {
+  if (!SCRIPT_URL) return;
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'delete', id }),
+    });
+  } catch(e) { console.warn('Sheet delete failed:', e); }
+}
+
 function getFlightLink(airline, flightNum) {
   const num = (flightNum||'').replace(/\s+/g,'').toUpperCase();
   const air = (airline||'').toLowerCase();
@@ -1458,7 +1491,7 @@ const INC_LEVELS = ['Low','Medium','High','Critical'];
 const INC_SITES = ['Hotel / HILTON','IAH Airport','Hobby Airport','Field / Venue','Team Bus','Other'];
 const INC_STATUS = ['Open','In Progress','Escalated','Resolved'];
 
-function IncidentsView({data, incidents, setIncidents}) {
+function IncidentsView({data, incidents, setIncidents, syncStatus, onRefresh}) {
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [search, setSearch] = useState('');
@@ -1472,15 +1505,17 @@ function IncidentsView({data, incidents, setIncidents}) {
   });
 
   const saveIncident = (data) => {
-    let next;
+    let inc, next;
     if (data.id) {
-      next = incidents.map(i=>i.id===data.id?{...data,updatedAt:new Date().toISOString()}:i);
+      inc = {...data, updatedAt: new Date().toISOString()};
+      next = incidents.map(i=>i.id===data.id ? inc : i);
     } else {
-      const newInc = {...data, id:`INC-${Date.now()}`, createdAt:new Date().toISOString(), updatedAt:new Date().toISOString()};
-      next = [newInc, ...incidents];
+      inc = {...data, id:`INC-${Date.now()}`, createdAt:new Date().toISOString(), updatedAt:new Date().toISOString()};
+      next = [inc, ...incidents];
     }
     setIncidents(next);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    upsertIncidentToSheet(inc); // write to shared sheet (non-blocking)
     setShowForm(false);
     setEditItem(null);
   };
@@ -1490,6 +1525,7 @@ function IncidentsView({data, incidents, setIncidents}) {
     const next = incidents.filter(i=>i.id!==id);
     setIncidents(next);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    deleteIncidentFromSheet(id); // remove from shared sheet (non-blocking)
   };
 
   const exportJSON = () => {
@@ -1515,11 +1551,20 @@ function IncidentsView({data, incidents, setIncidents}) {
       <div className="section-header">
         <div>
           <div className="section-heading">🚨 Incident Tracker</div>
-          <div className="section-sub">{incidents.length} total · {incidents.filter(i=>i.status!=='Resolved').length} open</div>
+          <div className="section-sub">
+            {incidents.length} total · {incidents.filter(i=>i.status!=='Resolved').length} open
+            {SCRIPT_URL
+              ? <span style={{marginLeft:10,fontSize:11,color: incidentSyncStatus==='synced'?'var(--green)':incidentSyncStatus==='error'?'var(--red)':'var(--text-dim)'}}>
+                  {incidentSyncStatus==='synced'?'● Live sync':'incidentSyncStatus'==='error'?'⚠ Sync error':'● Connecting…'}
+                </span>
+              : <span style={{marginLeft:10,fontSize:11,color:'var(--amber)'}}>⚠ Local only — set SCRIPT_URL to enable shared sync</span>
+            }
+          </div>
         </div>
         <div style={{display:'flex',gap:8}}>
           <button className="btn btn-ghost btn-sm" onClick={exportJSON}>💾 Export JSON</button>
           <button className="btn btn-ghost btn-sm" onClick={exportCSV}>📥 Export CSV</button>
+          {SCRIPT_URL && <button className="btn btn-ghost btn-sm" onClick={onRefresh} title="Pull latest incidents from shared sheet">↻ Sync</button>}
           <button className="btn btn-primary" onClick={()=>{setEditItem(null);setShowForm(true)}}>+ Log Incident</button>
         </div>
       </div>
@@ -2053,12 +2098,36 @@ function App() {
     }
   }, []);
 
+  const [incidentSyncStatus, setIncidentSyncStatus] = useState('');
+
+  const refreshIncidents = useCallback(async () => {
+    const fromSheet = await loadIncidentsFromSheet();
+    if (fromSheet) {
+      setIncidents(fromSheet);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(fromSheet));
+      setIncidentSyncStatus('synced');
+    } else {
+      setIncidentSyncStatus(SCRIPT_URL ? 'error' : 'local');
+    }
+  }, []);
+
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) try { setIncidents(JSON.parse(saved)); } catch(e){}
+    // Load statuses from localStorage
     const savedSt = localStorage.getItem(STATUS_KEY);
     if (savedSt) try { setStatuses(JSON.parse(savedSt)); } catch(e){}
+    // Load incidents: try sheet first, fall back to localStorage
+    refreshIncidents().catch(() => {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) try { setIncidents(JSON.parse(saved)); } catch(e){}
+    });
   }, []);
+
+  // Auto-refresh incidents every 30 seconds to pick up other users' changes
+  useEffect(() => {
+    if (!SCRIPT_URL) return;
+    const timer = setInterval(refreshIncidents, 30000);
+    return () => clearInterval(timer);
+  }, [refreshIncidents]);
 
   // Auto-fetch on login
   useEffect(() => {
@@ -2091,7 +2160,7 @@ function App() {
     players: <PlayersView data={DATA}/>,
     staff: <StaffView data={DATA}/>,
     schedule: <ScheduleView/>,
-    incidents: <IncidentsView data={DATA} incidents={incidents} setIncidents={setIncidents}/>,
+    incidents: <IncidentsView data={DATA} incidents={incidents} setIncidents={setIncidents} syncStatus={incidentSyncStatus} onRefresh={refreshIncidents}/>,
   };
 
   const titles = {
