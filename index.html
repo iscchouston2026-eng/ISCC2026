@@ -2182,6 +2182,153 @@ function IncidentForm({item, data, onSave, onCancel}) {
 // ============================================================
 // STAFF DIRECTORY
 // ============================================================
+// ============================================================
+// HCP — HEALTHCARE PROFESSIONAL COVERAGE
+// ============================================================
+const HCP_DATA = [
+  {
+    venue:'KISC', color:'var(--blue)',
+    venueFull:'Katy International Sports Complex',
+    address:'2029 Pecan Lane, Katy, TX 77494',
+    shifts:[
+      { date:'Apr 4', shift:'AM', time:'8:00 AM – 2:30 PM', staff:[
+        {name:'Tania Kassamali', role:'Clinical Pharmacist', phone:'817-881-4893'},
+        {name:'Anique Punjwani',  role:'NP',                 phone:'404-786-4665'},
+        {name:'Kashaf Ali',       role:'MA',                 phone:'512-712-3264', note:'10 AM–5 PM'},
+      ]},
+      { date:'Apr 4', shift:'PM', time:'2:00 PM – 8:00 PM', staff:[
+        {name:'Alena Virani',    role:'MA', phone:'832-684-7116'},
+        {name:'Elisha Lalani',   role:'MD', phone:'409-489-5490'},
+        {name:'Moonisha Kabani', role:'MA', phone:'346-219-7469'},
+        {name:'Misbah Kabani',   role:'MA', phone:'832-955-3852'},
+        {name:'Anique Punjwani', role:'NP', phone:'404-786-4665'},
+        {name:'Kashaf Ali',      role:'MA', phone:'512-712-3264', note:'10 AM–5 PM'},
+      ]},
+      { date:'Apr 5', shift:'AM', time:'8:00 AM – 12:30 PM', staff:[
+        {name:'Noorjehan Abdullah', role:'RN', phone:'281-794-0132'},
+        {name:'Raheel Ali',         role:'MD', phone:'832-704-3711'},
+        {name:'Shabnam Nensy',      role:'PT', phone:'832-471-0580'},
+        {name:'Ali Umatiya',        role:'RN', phone:'210-712-6086'},
+      ]},
+      { date:'Apr 5', shift:'PM', time:'12:00 PM – 5:00 PM', staff:[
+        {name:'Aqeeb Ali',      role:'MD',  phone:'832-298-8327', note:'12 PM–5 PM'},
+        {name:'Anique Punjwani',role:'NP',  phone:'404-786-4665', note:'1 PM–5 PM'},
+        {name:'Rohan Bhimani',  role:'MD',  phone:'786-451-0776'},
+        {name:'Heena Ali',      role:'RN',  phone:'281-924-3953', note:'1 PM–5 PM'},
+        {name:'Sophia Ali',     role:'MA',  phone:'346-901-7525', note:'1 PM–5 PM'},
+        {name:'Zehneel Jiwani', role:'CAA', phone:'404-429-9205', note:'2 PM–5 PM'},
+      ]},
+    ]
+  },
+  {
+    venue:'HSF', color:'var(--green)',
+    venueFull:'Houston Soccer Field',
+    address:'18850 FM 529, Cypress, TX 77433',
+    shifts:[
+      { date:'Apr 4', shift:'AM', time:'9:00 AM – 3:00 PM', staff:[
+        {name:'Almas Amin',       role:'NP',  phone:'404-751-6581'},
+        {name:'Shamshad Tharani', role:'NP',  phone:'832-385-5608', note:'9 AM–12 PM'},
+        {name:'Jasmine Prasla',   role:'RN',  phone:'832-317-5560', note:'9 AM–12 PM'},
+        {name:'Asif Kabani',      role:'MD',  phone:'469-449-3194'},
+      ]},
+      { date:'Apr 4', shift:'PM', time:'3:30 PM – 9:00 PM', staff:[
+        {name:'Farana Jesani', role:'Pharm Tech', phone:'832-968-2401', note:'4 PM–8 PM'},
+        {name:'Henna Ali',     role:'RN',         phone:'281-924-3953', note:'3 PM–9 PM'},
+        {name:'Sophia Ali',    role:'MA',          phone:'346-901-7525', note:'3 PM–9 PM'},
+      ]},
+    ]
+  }
+];
+
+const ROLE_COLORS = {
+  'MD':'var(--red)', 'NP':'var(--blue)', 'RN':'var(--cyan)',
+  'MA':'var(--amber)', 'PT':'var(--green)', 'CAA':'var(--purple)',
+  'Pharm Tech':'#f97316', 'Clinical Pharmacist':'#6366f1',
+};
+function roleColor(r){ return ROLE_COLORS[r] || 'var(--text-dim)'; }
+
+function HCPView() {
+  const [venueIdx, setVenueIdx] = useState(0);
+  const venue = HCP_DATA[venueIdx];
+  const days = [...new Set(venue.shifts.map(s=>s.date))];
+
+  return (
+    <div>
+      <div className="section-header">
+        <div>
+          <div className="section-heading">🏥 Healthcare Professional Coverage</div>
+          <div className="section-sub">On-site medical staff schedule by venue</div>
+        </div>
+      </div>
+
+      {/* Venue tabs */}
+      <div style={{display:'flex',gap:8,marginBottom:20}}>
+        {HCP_DATA.map((v,i)=>(
+          <button key={v.venue} onClick={()=>setVenueIdx(i)}
+            style={{padding:'8px 20px',borderRadius:8,border:'2px solid '+(i===venueIdx?v.color:'var(--border)'),
+              background:i===venueIdx?v.color+'22':'var(--surface2)',
+              color:i===venueIdx?v.color:'var(--text-dim)',fontWeight:700,fontSize:13,cursor:'pointer'}}>
+            {v.venue}
+          </button>
+        ))}
+      </div>
+
+      {/* Venue info */}
+      <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 16px',marginBottom:20,display:'flex',alignItems:'center',gap:12}}>
+        <span style={{fontSize:24}}>{venue.venue==='KISC'?'🏟':'⚽'}</span>
+        <div>
+          <div style={{fontWeight:700,fontSize:14,color:venue.color}}>{venue.venueFull}</div>
+          <div style={{fontSize:12,color:'var(--text-dim)',marginTop:2}}>📍 {venue.address}</div>
+        </div>
+        <span style={{marginLeft:'auto',fontSize:12,color:'var(--text-dim)'}}>
+          {venue.shifts.reduce((a,s)=>a+s.staff.length,0)} HCPs · {venue.shifts.length} shifts
+        </span>
+      </div>
+
+      {/* Day groups */}
+      {days.map(day=>{
+        const dayShifts = venue.shifts.filter(s=>s.date===day);
+        return (
+          <div key={day} style={{marginBottom:24}}>
+            <div style={{fontWeight:800,fontSize:13,color:'var(--text-dim)',letterSpacing:1,textTransform:'uppercase',marginBottom:12,paddingBottom:6,borderBottom:'1px solid var(--border)'}}>
+              📅 {day}
+            </div>
+            {dayShifts.map((sh,si)=>(
+              <div key={si} style={{marginBottom:16}}>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+                  <span style={{background:sh.shift==='AM'?'var(--amber)22':'var(--purple)22',
+                    color:sh.shift==='AM'?'var(--amber)':'var(--purple)',
+                    border:'1px solid '+(sh.shift==='AM'?'var(--amber)':'var(--purple)'),
+                    borderRadius:6,padding:'2px 10px',fontWeight:700,fontSize:12}}>
+                    {sh.shift}
+                  </span>
+                  <span style={{fontSize:13,color:'var(--text-dim)'}}>{sh.time}</span>
+                  <span style={{marginLeft:'auto',fontSize:11,color:'var(--text-dim)'}}>{sh.staff.length} staff</span>
+                </div>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:10}}>
+                  {sh.staff.map((p,pi)=>(
+                    <div key={pi} style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:10,padding:'12px 14px',display:'flex',alignItems:'flex-start',gap:10}}>
+                      <div style={{width:36,height:36,borderRadius:'50%',background:roleColor(p.role)+'33',border:'2px solid '+roleColor(p.role),display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,fontSize:13,fontWeight:800,color:roleColor(p.role)}}>
+                        {p.role.split(' ').map(w=>w[0]).join('').slice(0,3)}
+                      </div>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontWeight:700,fontSize:13,marginBottom:2}}>{p.name}</div>
+                        <div style={{fontSize:11,fontWeight:600,color:roleColor(p.role),marginBottom:4}}>{p.role}</div>
+                        {p.phone && <a href={'tel:'+p.phone.replace(/\D/g,'')} style={{fontSize:12,color:'var(--cyan)',display:'flex',alignItems:'center',gap:4}}>📞 {p.phone}</a>}
+                        {p.note && <div style={{fontSize:11,color:'var(--text-dim)',marginTop:4,fontStyle:'italic'}}>⏰ {p.note}</div>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function StaffView({data}) {
   const [search, setSearch] = useState('');
   const staff = data.staff.filter(s=>{
@@ -2599,6 +2746,7 @@ function App() {
     {section:'PEOPLE'},
     {key:'players', icon:'👥', label:'Athlete Profiles', badge: DATA.players.length},
     {key:'staff', icon:'👔', label:'Staff Directory'},
+    {key:'hcp', icon:'🏥', label:'Healthcare Team'},
     {section:'TOURNAMENT'},
     {key:'schedule', icon:'📅', label:'Schedule & Venues'},
     {key:'teams', icon:'⚽', label:'Teams', badge: DATA.teams?.length||null},
@@ -2613,6 +2761,7 @@ function App() {
     flights: <FlightSummaryView data={DATA}/>,
     players: <PlayersView data={DATA}/>,
     staff: <StaffView data={DATA}/>,
+    hcp: <HCPView/>,
     schedule: <ScheduleView/>,
     teams: <TeamsView data={DATA}/>,
     incidents: <IncidentsView data={DATA} incidents={incidents} setIncidents={setIncidents} syncStatus={incidentSyncStatus} onRefresh={refreshIncidents}/>,
@@ -2621,7 +2770,7 @@ function App() {
   const titles = {
     dashboard:'Command Center Dashboard', arrivals:'Airport Arrivals',
     departures:'Departures', flights:'Flight Summary',
-    players:'Athlete Profiles', staff:'Staff Directory', schedule:'Schedule & Venues', incidents:'Incident Tracker', teams:'Teams'
+    players:'Athlete Profiles', staff:'Staff Directory', hcp:'Healthcare Team', schedule:'Schedule & Venues', incidents:'Incident Tracker', teams:'Teams'
   };
 
   const liveIndicator = () => {
